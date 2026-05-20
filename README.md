@@ -36,7 +36,8 @@
 13. [URL-маршрути](#13-url-маршрути)
 14. [Ролі та права доступу](#14-ролі-та-права-доступу)
 15. [Функціональні та нефункціональні вимоги](#15-функціональні-та-нефункціональні-вимоги)
-16. [Розробник](#16-розробник)
+16. [Управління базою даних](#16-управління-базою-даних)
+17. [Розробник](#17-розробник)
 
 ---
 
@@ -52,15 +53,16 @@
 - **Дублювання роботи** — кілька волонтерів брались за одну заявку
 - **Відсутності звітності** — неможливо було автоматично формувати звіти для донорів
 - **Непрозорості процесу** — жодного журналу хто, коли і що зробив
+- **Відсутності зворотного зв'язку** — військовий не міг дізнатись статус свого запиту
 
 ### Що вирішує ця система
 
 ```
-Заявка від військового → Реєстр волонтерів → Закупівля → Звіт для донорів
-       (публічна форма)     (дашборд + фільтри)  (IN-BUY форма)   (Excel .xlsx)
+Заявка від військового → Унікальний код → Реєстр волонтерів → Закупівля → Звіт для донорів
+   (публічна форма)      (A3F7-2B19)     (дашборд + фільтри)  (IN-BUY форма) (Excel .xlsx)
 ```
 
-Система є **єдиним цифровим реєстром** усіх заявок із повним відстеженням статусів, автоматичним журналом аудиту та вбудованою звітністю.
+Система є **єдиним цифровим реєстром** усіх заявок із повним відстеженням статусів, автоматичним журналом аудиту, вбудованою звітністю та публічним трекінгом стану заявки.
 
 ### Ключові переваги
 
@@ -68,6 +70,7 @@
 |---|---|
 | 📱 Мобільна доступність | Публічна форма оптимізована для смартфонів — військові заповнюють з поля |
 | 🔒 Без реєстрації | Військовим не потрібен обліковий запис для подачі заявки |
+| 🔑 Безпечний трекінг | Унікальний код доступу замість порядкового ID захищає від несанкціонованого перегляду |
 | 📊 Автоматична звітність | Excel-звіт для донорів генерується в 1 клік |
 | 🕵️ Повний аудит | Кожна зміна фіксується: хто, коли, що змінив |
 | 🔄 Контроль дублювання | Система блокує взяття заявки якщо вона вже в роботі |
@@ -84,7 +87,7 @@
 **Чому обрано:**
 - Найпопулярніша мова для веб-розробки у 2024–2025 роках
 - Django написаний на Python — нативна підтримка без мостів
-- Широка екосистема: `openpyxl` (Excel), `Pillow` (зображення), `psycopg2` (PostgreSQL)
+- Широка екосистема: `openpyxl` (Excel), `Pillow` (зображення), `psycopg2` (PostgreSQL), `secrets` (криптографічно стійка генерація кодів)
 - Читабельний синтаксис — легко підтримувати та розширювати
 
 #### Django 5.x
@@ -156,7 +159,18 @@ django.db.models.signals → реактивна логіка (AuditLog)
 - Стандартна Python-бібліотека для роботи із зображеннями
 - Потрібна для `ImageField` у Django моделі `Purchase`
 
-### 2.5 Інфраструктура
+### 2.5 Безпека
+
+#### secrets (стандартна бібліотека Python)
+**Роль:** Криптографічно стійка генерація унікальних кодів доступу до заявок.
+
+**Чому обрано:**
+- Модуль зі стандартної бібліотеки Python — без зовнішніх залежностей
+- `secrets.token_hex()` генерує байти з `/dev/urandom` (OS CSPRNG)
+- На відміну від `random` — не піддається передбаченню навіть при знанні попередніх значень
+- Використовується для генерації кодів виду `A3F7-2B19` (захист від перебору: 4 млрд+ варіантів)
+
+### 2.6 Інфраструктура
 
 #### Docker + Docker Compose v2
 **Роль:** Контейнеризація та управління середовищем розробки.
@@ -173,9 +187,8 @@ django.db.models.signals → реактивна логіка (AuditLog)
 **Практики:**
 - `.gitignore` виключає: `__pycache__`, `.env`, `media/`, `staticfiles/`
 - `.env.example` — шаблон для нових розробників (без реальних секретів)
-- Гілки: `main` — стабільна версія
 
-### 2.6 Додаткові інструменти
+### 2.7 Додаткові інструменти
 
 #### python-decouple
 Читає змінні оточення з `.env` файлу. Відокремлює конфігурацію від коду.
@@ -199,14 +212,15 @@ django.db.models.signals → реактивна логіка (AuditLog)
 ┌─────────────────────▼───────────────────────────────────┐
 │                 РІВЕНЬ БІЗНЕС-ЛОГІКИ                    │
 │                                                         │
-│  Django Views          Services                         │
-│  ┌──────────────┐  ┌────────────────┐                   │
-│  │create_request│  │ FilterService  │                   │
-│  │  dashboard   │  │ StatusService  │                   │
-│  │request_detail│  │RequestValidator│                   │
-│  │export_report │  │ ReportEngine   │                   │
-│  │purchase_creat│  └────────────────┘                   │
-│  └──────────────┘                                       │
+│  Django Views             Services                      │
+│  ┌───────────────────┐  ┌────────────────┐              │
+│  │create_request     │  │ FilterService  │              │
+│  │request_success    │  │ StatusService  │              │
+│  │check_request_stat │  │RequestValidator│              │
+│  │dashboard          │  │ ReportEngine   │              │
+│  │request_detail     │  └────────────────┘              │
+│  │export_report      │                                  │
+│  └───────────────────┘                                  │
 │                                                         │
 │  Django Middleware: Security → Session → CSRF → Auth    │
 └─────────────────────┬───────────────────────────────────┘
@@ -214,8 +228,8 @@ django.db.models.signals → реактивна логіка (AuditLog)
 ┌─────────────────────▼───────────────────────────────────┐
 │                    РІВЕНЬ ДАНИХ                         │
 │                                                         │
-│  Models: CustomUser, Request, Category,                 │
-│          Comment, AuditLog, Purchase                    │
+│  Models: CustomUser, Request (+ access_code),           │
+│          Category, Comment, AuditLog, Purchase          │
 │                                                         │
 │              PostgreSQL 16                              │
 └─────────────────────────────────────────────────────────┘
@@ -256,41 +270,6 @@ Django реалізує власну варіацію класичного MVC, 
 10. HttpResponse → браузер
 ```
 
-### 3.4 Діаграма компонентів системи
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                        Django App                            │
-│                                                              │
-│  ┌─────────────┐   ┌──────────────────┐   ┌──────────────┐  │
-│  │ Auth Module │   │ RequestController│   │ ReportEngine │  │
-│  │             │   │                  │   │              │  │
-│  │ CustomUser  │   │ create_request   │   │ export_report│  │
-│  │ login_view  │   │ dashboard        │   │ purchase_    │  │
-│  │ volunteer   │   │ request_detail   │   │   create     │  │
-│  │   CRUD      │   │                  │   │ excel_export │  │
-│  └──────┬──────┘   └────────┬─────────┘   └──────┬───────┘  │
-│         │                   │                    │           │
-│         └─────────┬─────────┘                    │           │
-│                   │                              │           │
-│         ┌─────────▼──────────────────────────────▼─────────┐ │
-│         │              Service Layer                        │ │
-│         │  FilterService  StatusService  RequestValidator   │ │
-│         └─────────────────────┬─────────────────────────── ┘ │
-│                               │ Django ORM                   │
-│         ┌─────────────────────▼──────────────────────────┐   │
-│         │           Models / Database Layer               │   │
-│         │  CustomUser  Request  Category  Comment         │   │
-│         │  AuditLog    Purchase                           │   │
-│         └────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────┘
-                              │
-                     ┌────────▼────────┐
-                     │  PostgreSQL 16  │
-                     │  (Docker: db)   │
-                     └─────────────────┘
-```
-
 ---
 
 ## 4. Структура проєкту
@@ -320,73 +299,55 @@ syla-yednosti/
 ├── 📁 apps/                           ← Django-застосунки
 │   │
 │   ├── 📁 accounts/                   ── Auth Module
-│   │   ├── __init__.py
-│   │   ├── apps.py
-│   │   ├── admin.py                   ← CustomUserAdmin
-│   │   ├── managers.py                ← CustomUserManager (create_user, create_superuser)
 │   │   ├── models.py                  ← CustomUser: email, role (VOLUNTEER/DIRECTOR)
+│   │   ├── managers.py                ← CustomUserManager
 │   │   ├── forms.py                   ← LoginForm, VolunteerCreateForm
 │   │   ├── views.py                   ← login_view, logout_view, volunteer CRUD
-│   │   ├── urls.py                    ← /login/, /logout/, /volunteers/
-│   │   └── migrations/
+│   │   └── urls.py                    ← /login/, /logout/, /volunteers/
 │   │
 │   ├── 📁 applications/               ── Ядро системи
-│   │   ├── __init__.py
-│   │   ├── apps.py                    ← ready(): реєстрація сигналів
-│   │   ├── admin.py                   ← RequestAdmin, CategoryAdmin, AuditLogAdmin
-│   │   ├── models.py                  ← Request, Category, Comment, AuditLog
+│   │   ├── models.py                  ← Request (+access_code), Category, Comment, AuditLog
 │   │   ├── forms.py                   ← RequestForm (публічна), CommentForm
-│   │   ├── views.py                   ← create_request, dashboard, request_detail
+│   │   ├── views.py                   ← create_request, request_success,
+│   │   │                                 check_request_status, dashboard, request_detail
 │   │   ├── signals.py                 ← pre_save → автозапис AuditLog
-│   │   ├── urls.py                    ← /, /dashboard/, /requests/<pk>/
-│   │   ├── migrations/
+│   │   ├── urls.py                    ← /, /success/<code>/, /check/, /dashboard/...
 │   │   ├── fixtures/
 │   │   │   └── categories.json        ← Початкові дані: 7 категорій
 │   │   └── services/
-│   │       ├── __init__.py
 │   │       ├── filter_service.py      ← FilterService: фільтрація QuerySet
 │   │       ├── status_service.py      ← StatusService: State Machine статусів
 │   │       └── validator.py           ← RequestValidator: телефон, кількість
 │   │
 │   └── 📁 reports/                    ── Звітність
-│       ├── __init__.py
-│       ├── apps.py
-│       ├── admin.py
 │       ├── models.py                  ← Purchase: дані закупівлі (IN-BUY)
 │       ├── forms.py                   ← PurchaseForm
 │       ├── views.py                   ← export_report, purchase_create
 │       ├── urls.py                    ← /reports/export/, /reports/purchase/<pk>/
-│       ├── migrations/
 │       └── services/
-│           ├── __init__.py
 │           └── excel_export.py        ← generate_report(): openpyxl → bytes
 │
 ├── 📁 templates/                      ← HTML-шаблони (Bootstrap 5)
 │   ├── base.html                      ← Базовий макет: navbar, messages, Bootstrap CDN
 │   ├── partials/
-│   │   ├── _navbar.html               ← Навігаційна панель (адаптивна, з ролями)
+│   │   ├── _navbar.html               ← Навігація (з посиланням "Перевірити статус")
 │   │   └── _messages.html             ← Flash-повідомлення Django
 │   ├── accounts/
-│   │   ├── login.html                 ← /login/ — форма входу
-│   │   ├── volunteer_list.html        ← /volunteers/ — список волонтерів
-│   │   └── volunteer_form.html        ← /volunteers/add/ — форма створення
+│   │   ├── login.html
+│   │   ├── volunteer_list.html
+│   │   └── volunteer_form.html
 │   ├── applications/
-│   │   ├── create_request.html        ← / — публічна форма заявки (UC-01)
-│   │   ├── request_success.html       ← Підтвердження після відправки
-│   │   ├── dashboard.html             ← /dashboard/ — реєстр + фільтри (UC-02)
-│   │   └── request_detail.html        ← /requests/<pk>/ — деталі + дії
+│   │   ├── create_request.html        ← Публічна форма заявки
+│   │   ├── request_success.html       ← Показує унікальний код доступу
+│   │   ├── check_status.html          ← Публічна перевірка статусу за кодом
+│   │   └── dashboard.html / request_detail.html
 │   └── reports/
-│       ├── report_form.html           ← /reports/export/ — форма вибору дат
-│       └── purchase_form.html         ← /reports/purchase/<pk>/ — IN-BUY форма
+│       ├── report_form.html
+│       └── purchase_form.html
 │
 ├── 📁 static/
-│   ├── css/
-│   │   └── main.css                   ← Кастомні стилі поверх Bootstrap
-│   └── js/
-│       └── main.js                    ← Клієнтська валідація форм (FR-02)
-│
-├── 📁 media/                          ← Завантажені файли (у .gitignore)
-│   └── receipts/                      ← Фото чеків Purchase.receipt_photo
+│   ├── css/main.css
+│   └── js/main.js
 │
 └── 📁 requirements/
     ├── base.txt                       ← Django, psycopg2, openpyxl, pillow, decouple
@@ -403,37 +364,29 @@ syla-yednosti/
 CustomUser ──┐
  email (UK)  │ assigned_to (FK, SET_NULL)
  role        ├──────────────────────────► Request
- is_active   │ changed_by (FK, SET_NULL) ──┤
- is_staff    │                             │
+ is_active   │                            ├── access_code (unique, 9 chars)
+ is_staff    │ changed_by (FK, SET_NULL)  ├── status (State Machine)
+             │                            ├── priority
              │                    category (FK, PROTECT)
              │                             │
              │                         Category
-             │                          name (UK)
-             │                          slug (UK)
+             │                          name (UK) / slug (UK)
              │
              │ author (FK, CASCADE)
              ├──────────────────────────► Comment
-             │                            text
-             │                            created_at
              │
              │ changed_by (FK, SET_NULL)
              └──────────────────────────► AuditLog
-                                           old_status
-                                           new_status
-                                           changed_at
+                                           old_status → new_status
 
-Purchase ──(OneToOne → Request)──► Request
-  actual_cost
-  purchase_date
-  funding_source
-  receipt_photo (ImageField)
-  created_by (FK → CustomUser)
+Purchase ──(OneToOne → Request)
+  actual_cost / purchase_date / funding_source / receipt_photo / created_by
 ```
 
 ### 5.2 Опис моделей
 
 #### `CustomUser` (apps/accounts)
-Замінює стандартну Django User модель. Логін — email (не username).
+Замінює стандартну Django User. Логін — email (не username).
 
 | Поле | Тип | Опис |
 |---|---|---|
@@ -442,16 +395,7 @@ Purchase ──(OneToOne → Request)──► Request
 | `is_active` | BooleanField | Чи може входити в систему |
 | `is_staff` | BooleanField | Доступ до Django Admin |
 
-#### `Category` (apps/applications)
-Довідник категорій потреб.
-
-| Поле | Тип | Опис |
-|---|---|---|
-| `name` | CharField (unique) | Назва: «Дрони та БПЛА» |
-| `slug` | SlugField (unique) | URL-ідентифікатор: `drones` |
-
 #### `Request` (apps/applications) — центральна модель
-Заявка від підрозділу. Відповідає вхідному документу **IN-REQ** з курсової.
 
 | Поле | Тип | Опис |
 |---|---|---|
@@ -463,17 +407,30 @@ Purchase ──(OneToOne → Request)──► Request
 | `quantity` | PositiveIntegerField | Кількість |
 | `priority` | CharField (choices) | `LOW` / `MEDIUM` / `CRITICAL` |
 | `location` | CharField | Населений пункт |
-| `post_dept` | PositiveIntegerField | Відділення Нової Пошти |
+| `post_dept` | CharField | Відділення Нової Пошти |
 | `status` | CharField (choices) | `NEW` / `IN_PROGRESS` / `DONE` / `CANCELED` |
 | `assigned_to` | FK → CustomUser | Відповідальний волонтер |
+| `access_code` | CharField (9, unique) | **Публічний код доступу** (напр. `A3F7-2B19`) |
 | `created_at` | DateTimeField | Дата/час створення (auto) |
 | `updated_at` | DateTimeField | Дата/час останньої зміни (auto) |
 
-#### `Comment` (apps/applications)
-Внутрішні нотатки волонтерів. Військові їх не бачать.
+**Генерація `access_code`** відбувається автоматично у `save()`:
+```python
+import secrets
+
+def save(self, *args, **kwargs):
+    if not self.access_code:
+        while True:
+            code = secrets.token_hex(2).upper() + "-" + secrets.token_hex(2).upper()
+            if not Request.objects.filter(access_code=code).exists():
+                self.access_code = code
+                break
+    super().save(*args, **kwargs)
+```
+Це гарантує унікальність коду та використання CSPRNG (`/dev/urandom`).
 
 #### `AuditLog` (apps/applications)
-Автоматичний журнал змін статусу через Django Signals.
+Автоматичний журнал змін статусу через Django Signals (pre_save).
 
 #### `Purchase` (apps/reports) — вхідний документ IN-BUY
 
@@ -483,24 +440,8 @@ Purchase ──(OneToOne → Request)──► Request
 | `actual_cost` | DecimalField | Фактична вартість (грн) |
 | `purchase_date` | DateField | Дата чека |
 | `funding_source` | CharField | Джерело фінансування |
-| `receipt_photo` | ImageField | Фото чека (зберігається у media/) |
+| `receipt_photo` | ImageField | Фото чека (media/) |
 | `created_by` | FK → CustomUser | Хто вніс дані |
-
-### 5.3 Індекси та оптимізація
-
-```python
-# Request.status — найчастіший фільтр на дашборді
-status = models.CharField(..., db_index=True)
-
-# Request.category — фільтрація по категорії
-category = models.ForeignKey(..., db_index=True)
-
-# CustomUser.email — unique автоматично створює індекс
-email = models.EmailField(unique=True)
-
-# Запобігання N+1 у dashboard view
-Request.objects.select_related("category", "assigned_to").all()
-```
 
 ---
 
@@ -508,18 +449,10 @@ Request.objects.select_related("category", "assigned_to").all()
 
 ### 6.1 Auth Module (`apps/accounts/`)
 
-Відповідає за автентифікацію та управління обліковими записами.
-
-**`CustomUserManager`** — кастомний менеджер:
-```python
-create_user(email, password, **extra_fields)      # Для волонтерів
-create_superuser(email, password, **extra_fields)  # role=DIRECTOR автоматично
-```
-
 **`login_view`** — сценарій UC-03:
-1. `authenticate(request, username=email, password=password)`
-2. При успіху → `login(request, user)` → Session cookie встановлюється
-3. Редирект на `/dashboard/`
+- `authenticate(request, username=email, password=password)`
+- При успіху → `login(request, user)` → Session cookie
+- Редирект на `/dashboard/`
 
 **`director_required`** — декоратор для захисту директорських view:
 ```python
@@ -530,76 +463,65 @@ def volunteer_list(request): ...
 
 ### 6.2 RequestController (`apps/applications/views.py`)
 
-Три основні view-функції:
-
-**`create_request`** — публічна (без `@login_required`):
+**`create_request`** — публічна форма:
 - GET: рендерить порожню `RequestForm`
-- POST: валідує → зберігає → редирект на success
+- POST: валідує → `obj = form.save()` → `access_code` генерується автоматично → редирект на `request_success` з кодом
+
+**`request_success`** — сторінка після подачі:
+- Отримує `code` з URL
+- Знаходить заявку по `access_code`
+- Відображає код великим шрифтом з попередженням зберегти його
+
+**`check_request_status`** — публічна перевірка *(нова функція)*:
+- GET: відображає форму для введення коду
+- POST: шукає заявку по `access_code.upper()`
+- Показує статус, деталі, дату оновлення, відповідального волонтера
+- При невалідному коді — повідомлення про помилку
 
 **`dashboard`** — панель управління (`@login_required`):
-- Завантажує всі `Request` з `select_related`
-- Передає через `FilterService.apply(qs, request.GET)`
-- Рахує агреговані лічильники одним SQL-запитом через `aggregate(Count(...))`
+- `select_related("category", "assigned_to")` для запобігання N+1
+- `FilterService.apply()` для фільтрації
+- `aggregate(Count(...))` — лічильники одним SQL-запитом
 
 **`request_detail`** — деталі заявки (`@login_required`):
-- GET: рендерить деталі + форму коментаря + журнал AuditLog
-- POST (new_status): викликає `StatusService.transition()`
-- POST (comment): зберігає `Comment` з `author=request.user`
+- POST `new_status` → `StatusService.transition()`
+- POST comment → `Comment` з `author=request.user`
 
-### 6.3 Сервісний шар (`apps/applications/services/`)
+### 6.3 Сервісний шар
 
-#### `FilterService`
-Фільтрація QuerySet за параметрами GET-запиту:
-```python
-FilterService.apply(queryset, {
-    "status":    "NEW",
-    "category":  "drones",
-    "unit_name": "72 ОМБр",
-    "search":    "Іванченко",
-})
+#### `StatusService` — State Machine статусів
 ```
-
-#### `StatusService`
-Кінцевий автомат (State Machine) статусів заявки:
-
-```
-NEW ──────────────────────────────────────► IN_PROGRESS
- │                                               │
- └──────────► CANCELED ◄─────────────────────────┤
-                                                 │
-                                              DONE ✓
+NEW ──────────────────────────────────► IN_PROGRESS
+ │                                           │
+ └──────────► CANCELED ◄─────────────────────┤
+                                             │
+                                          DONE ✓
 ```
 
 ```python
 ALLOWED_TRANSITIONS = {
     "NEW":         ["IN_PROGRESS", "CANCELED"],
     "IN_PROGRESS": ["DONE",        "CANCELED"],
-    "DONE":        [],   # фінальний — без переходів
-    "CANCELED":    [],   # фінальний — без переходів
+    "DONE":        [],
+    "CANCELED":    [],
 }
-
-StatusService.transition(request_obj, "IN_PROGRESS", changed_by=request.user)
 ```
 
-При переході до `IN_PROGRESS`:
-- `assigned_to` = `changed_by` (поточний волонтер)
-- `_changed_by` встановлюється для Django Signal
+При переході до `IN_PROGRESS`: `assigned_to = changed_by`.
 
-#### `RequestValidator`
-Серверна валідація (доповнює форму):
+#### `FilterService`
 ```python
-RequestValidator.validate_phone("+380991234567")  # → True/False (regex)
-RequestValidator.validate_quantity(0)              # → False (має бути > 0)
+FilterService.apply(queryset, status="NEW", category_slug="drones",
+                    unit_name="72 ОМБр", search="Іванченко")
 ```
 
 ### 6.4 AuditLog через Django Signals
 
 ```python
-# apps/applications/signals.py
 @receiver(pre_save, sender=Request)
 def log_status_change(sender, instance, **kwargs):
     if not instance.pk:
-        return  # нова заявка — нічого логувати
+        return
     old = Request.objects.get(pk=instance.pk)
     if old.status != instance.status:
         AuditLog.objects.create(
@@ -610,26 +532,15 @@ def log_status_change(sender, instance, **kwargs):
         )
 ```
 
-Реєстрація у `apps/applications/apps.py`:
-```python
-def ready(self):
-    import apps.applications.signals  # noqa
-```
-
 ### 6.5 ReportEngine (`apps/reports/`)
 
-**`purchase_create`** — внесення даних закупівлі (IN-BUY):
-- Доступний тільки для заявок зі статусом `IN_PROGRESS`
-- Блокує якщо `Purchase` вже існує (OneToOne)
-- Після збереження автоматично переводить заявку → `DONE`
-
-**`generate_report(purchases, date_from, date_to)`** — генерація OUT-REP:
+**`generate_report(purchases, date_from, date_to)`:**
 ```
 Workbook → Лист «Звіт»
-  → Рядок 1: Merged title «Звіт БФ «Сила Єдності» за період...»
-  → Рядок 3: Кольорова шапка (темно-синій фон, білий текст)
-  → Рядки 4+: Дані з Purchase (дата, підрозділ, що передано, категорія, сума)
-  → Footer:   «Всього заявок виконано: N» + «Загальна сума витрат: X грн»
+  → Merged title «Звіт БФ «Сила Єдності» за період...»
+  → Кольорова шапка (темно-синій фон, білий текст)
+  → Рядки даних з Purchase
+  → Footer: загальна сума та кількість виконаних заявок
 → BytesIO → HTTP response (Content-Disposition: attachment)
 ```
 
@@ -637,7 +548,7 @@ Workbook → Лист «Звіт»
 
 ## 7. Бізнес-логіка та сценарії використання
 
-### 7.1 UC-01: Подача заявки
+### 7.1 UC-01: Подача заявки з отриманням коду доступу
 
 **Актор:** Представник військового підрозділу (без авторизації)
 
@@ -647,132 +558,124 @@ Workbook → Лист «Звіт»
 Основний потік:
   1. Користувач відкриває localhost:8000
   2. Система відображає форму RequestForm (9 полів)
-  3. Користувач заповнює всі обов'язкові поля
-  4. Клієнтська валідація (main.js): формат телефону +380
-  5. POST-запит → серверна валідація (RequestForm.clean_phone())
-  6. Збереження Request зі статусом NEW
-  7. Редирект → request_success.html
+  3. Клієнтська валідація (main.js): формат телефону +380
+  4. POST → серверна валідація → збереження Request
+  5. При збереженні автоматично генерується access_code (напр. A3F7-2B19)
+  6. Редирект → request_success/<access_code>/
+  7. Сторінка відображає код великим шрифтом з попередженням:
+     «Запишіть або сфотографуйте — код більше не відобразиться»
 
-Альтернативний потік А1 (помилка валідації):
-  3а. Невірний формат телефону → is-invalid підсвічування
-  3б. Порожнє обов'язкове поле → форма не відправляється
-  → Повернення до кроку 3
+Альтернативний потік (помилка валідації):
+  → Форма з підсвічуванням помилок, повторне заповнення
 ```
 
-### 7.2 UC-02: Обробка заявки
+### 7.2 UC-NEW: Перевірка статусу заявки *(нова функція)*
 
-**Актор:** Волонтер (авторизований)
+**Актор:** Представник військового підрозділу (без авторизації)
 
 ```
-Передумова: Волонтер авторизований, є заявки зі статусом NEW
+Передумова: Заявку подано, є код доступу (напр. A3F7-2B19)
 
 Основний потік:
-  1. Волонтер відкриває /dashboard/
-  2. Бачить заявки зі статусом NEW (червоний бейдж)
-  3. Застосовує фільтри за потребою (FR-05)
-  4. Відкриває деталі → натискає «Взяти в роботу»
-  5. StatusService.transition(req, IN_PROGRESS, user)
-     → assigned_to = поточний волонтер
-     → AuditLog запис створюється через Signal
-  6. Волонтер виконує закупівлю (поза системою)
-  7. Повертається → натискає «Внести дані закупівлі»
-  8. Заповнює PurchaseForm: вартість, дата, джерело, фото чека
-  9. Збереження Purchase → автоматичний перехід → DONE
+  1. Користувач відкриває /check/ (або натискає «Перевірити статус» у навбарі)
+  2. Вводить код у поле (великими чи малими літерами — однаково)
+  3. POST → пошук Request.objects.get(access_code=raw.upper())
+  4. Система відображає:
+     — Статус з кольоровим бейджем та поясненням
+     — Підрозділ, категорія, опис потреби, кількість
+     — Дата подачі та дата останнього оновлення
+     — ПІБ/email відповідального волонтера (якщо призначено)
+  5. Статуси та їх значення для військового:
+     ⬜ Нова          → «Заявку отримано, очікує на обробку»
+     🔵 В обробці    → «Волонтери вже працюють над вашою заявкою»
+     🟢 Виконано     → «Заявку виконано!»
+     🔴 Скасовано    → «На жаль, заявку скасовано»
 
-Виняткова ситуація (блокування):
-  4а. Заявку вже взяв інший волонтер (assigned_to != None)
-  → Кнопки зміни статусу замінюються на попередження:
-     «Заявка заблокована: [email волонтера]»
+Альтернативний потік (невірний код):
+  → «Заявку з кодом «XYZ» не знайдено. Перевірте правильність введення.»
 ```
 
-### 7.3 UC-03: Авторизація
-
-**Актор:** Волонтер або Директор
+### 7.3 UC-02: Обробка заявки волонтером
 
 ```
-1. Відкриває /login/
-2. Вводить email + пароль
-3. authenticate() → перевіряє хеш PBKDF2-SHA256
-4а. Успіх → login() → session cookie → редирект /dashboard/
-4б. Помилка → «Невірний email або пароль» всередині картки
+1. Волонтер відкриває /dashboard/
+2. Бачить заявки зі статусом NEW
+3. Відкриває деталі → «Взяти в роботу»
+4. StatusService.transition(req, IN_PROGRESS, user)
+   → assigned_to = поточний волонтер
+   → AuditLog запис через Signal
+5. Волонтер виконує закупівлю
+6. Вносить дані закупівлі (IN-BUY форма)
+7. Purchase збережено → автоматичний перехід → DONE
 ```
 
-### 7.4 UC-07: Генерація звіту
-
-**Актор:** Директор (role=DIRECTOR)
+### 7.4 UC-07: Генерація звіту для донорів
 
 ```
 1. Директор відкриває /reports/export/
 2. Вибирає date_from та date_to
-3. GET-запит → фільтрація Purchase за датами
-4. generate_report() → openpyxl Workbook → bytes
-5. HTTP response з Content-Disposition: attachment
-6. Браузер завантажує .xlsx файл
-```
-
-### 7.5 UC-08: Управління волонтерами
-
-**Актор:** Директор
-
-```
-1. Директор відкриває /volunteers/
-2. Бачить список всіх користувачів з ролями та статусами
-3. Натискає «Додати волонтера» → /volunteers/add/
-4. Заповнює VolunteerCreateForm: email, role, password
-5. Перевірка: email унікальний, паролі співпадають
-6. Збереження → CustomUser.objects.create_user()
-7а. «Заблокувати» → user.is_active = False → волонтер не може увійти
-7б. «Активувати» → user.is_active = True → доступ відновлено
+3. generate_report() → openpyxl → bytes
+4. HTTP response → браузер завантажує .xlsx
 ```
 
 ---
 
 ## 8. Безпека системи
 
-### 8.1 Автентифікація та сесії
+### 8.1 Захист публічного трекінгу (IDOR Prevention)
 
-- Django session-based authentication
-- Session ID у `httpOnly` cookie — недоступний для JavaScript (XSS-захист)
-- `@login_required` — неавторизованих автоматично редиректить на `/login/`
-- `@director_required` — власний декоратор для сторінок директора
-- Публічна форма `/` — навмисно відкрита без авторизації (вимога системи)
+Класична вразливість **IDOR (Insecure Direct Object Reference)** — коли порядковий ID у URL дозволяє будь-кому переглянути чужі дані (заявка №7, №8, №9...).
 
-### 8.2 CSRF-захист
+**Рішення:** замість порядкового ID використовується `access_code` — криптографічно стійкий код формату `A3F7-2B19`.
 
 ```python
-# Активовано у MIDDLEWARE:
-"django.middleware.csrf.CsrfViewMiddleware"
+# Генерація через secrets (CSPRNG, /dev/urandom)
+secrets.token_hex(2).upper() + "-" + secrets.token_hex(2).upper()
+# → 2 байти = 65536 варіантів на частину
+# → разом: 65536² ≈ 4 млрд варіантів для однієї пари
+```
 
-# Кожна форма містить:
-{% csrf_token %}
+Порівняння підходів:
 
+| Підхід | Варіантів | Ризик перебору |
+|---|---|---|
+| Порядковий ID (`/7/`) | ~1000 (реальні) | Критичний — переглянути всіх |
+| Короткий код `A3F7-2B19` | ~4 млрд | Мінімальний (+ rate-limit) |
+| UUID | ~2¹²² | Нульовий |
+
+### 8.2 Автентифікація та сесії
+
+- Session-based authentication з httpOnly cookie
+- `@login_required` — захист всіх внутрішніх сторінок
+- `@director_required` — власний декоратор для директорських view
+- Публічні сторінки (`/`, `/check/`, `/success/<code>/`) — навмисно відкриті
+
+### 8.3 CSRF-захист
+
+```python
+"django.middleware.csrf.CsrfViewMiddleware"  # у MIDDLEWARE
+{% csrf_token %}  # у кожній формі
 # POST без токена → HTTP 403 Forbidden
 ```
 
-### 8.3 Захист від SQL-ін'єкцій
+### 8.4 Захист від SQL-ін'єкцій
 
-**Всі запити — виключно через Django ORM:**
-```python
-# ✅ Безпечно — ORM параметризує значення
-Request.objects.filter(unit_name__icontains=unit_name)
+Всі запити — виключно через Django ORM (параметризовані запити). Рядкова конкатенація в SQL відсутня.
 
-# ❌ Такого коду в проєкті немає
-cursor.execute(f"SELECT * FROM requests WHERE unit = '{unit_name}'")
-```
-
-### 8.4 Хешування паролів
+### 8.5 Хешування паролів
 
 ```
 Алгоритм: PBKDF2 + SHA256 + сіль (Django default)
 Зберігається: pbkdf2_sha256$600000$<сіль>$<хеш>
-У відкритому вигляді: ніде не зберігається, не логується
+У відкритому вигляді: ніколи
 ```
 
-### 8.5 Ролева модель доступу (RBAC)
+### 8.6 Ролева модель доступу (RBAC)
 
 | Ресурс | Без входу | Волонтер | Директор |
 |---|---|---|---|
 | Форма заявки `/` | ✅ | ✅ | ✅ |
+| Перевірка статусу `/check/` | ✅ | ✅ | ✅ |
 | Дашборд `/dashboard/` | ❌ | ✅ | ✅ |
 | Деталі заявки | ❌ | ✅ | ✅ |
 | Форма закупівлі | ❌ | ✅ | ✅ |
@@ -809,24 +712,13 @@ cursor.execute(f"SELECT * FROM requests WHERE unit = '{unit_name}'")
     localhost:8000
 ```
 
-### 9.2 Bind Mount та Hot Reload
-
-Директорія проєкту монтується у контейнер як bind mount:
-```yaml
-volumes:
-  - .:/app  # локальна директорія → /app у контейнері
-```
-
-Django `runserver` автоматично перезавантажується при зміні `.py` файлів — не потрібно перезапускати контейнер.
-
-### 9.3 Health Check
+### 9.2 Health Check
 
 ```yaml
 db:
   healthcheck:
     test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
     interval: 10s
-    timeout: 5s
     retries: 5
 
 web:
@@ -852,21 +744,25 @@ cd syla-yednosti
 
 # 2. Налаштувати оточення
 cp .env.example .env
-# Відредагуй .env: змінити DJANGO_SECRET_KEY на будь-який довгий рядок
+# Відредагуй .env — змінити DJANGO_SECRET_KEY на довгий випадковий рядок
 
 # 3. Запустити (перший раз ~3 хвилини)
 docker compose up --build
 
-# 4. У новому терміналі — міграції та дані
+# 4. У новому терміналі — міграції та початкові дані
 docker compose exec web python manage.py migrate
 docker compose exec web python manage.py loaddata categories
 
 # 5. Створити директора фонду
 docker compose exec web python manage.py createsuperuser
 # → вводиш email і пароль
+# → у Django Admin (/admin/) встанови role=DIRECTOR і is_staff=True
 
 # 6. Відкрити в браузері
-# http://localhost:8000/
+# http://localhost:8000/          — публічна форма заявки
+# http://localhost:8000/check/    — перевірка статусу
+# http://localhost:8000/login/    — вхід для волонтерів
+# http://localhost:8000/admin/    — Django Admin
 ```
 
 ### Зупинка
@@ -907,14 +803,14 @@ DB_PORT=5432
 ## 12. Команди Makefile
 
 ```bash
-make run            # docker compose up (запуск)
-make build          # docker compose up --build (перебудова)
+make run            # docker compose up
+make build          # docker compose up --build
 make stop           # docker compose down
 
 make migrate        # python manage.py migrate
 make makemigrations # python manage.py makemigrations
 make superuser      # python manage.py createsuperuser
-make shell          # python manage.py shell (інтерактивна консоль)
+make shell          # python manage.py shell
 make logs           # docker compose logs -f web
 make test           # python manage.py test
 ```
@@ -926,10 +822,11 @@ make test           # python manage.py test
 | Метод | URL | View | Авторизація | Опис |
 |---|---|---|---|---|
 | GET/POST | `/` | `create_request` | Публічна | Форма заявки для військових |
-| GET | `/success/` | `request_success` | Публічна | Підтвердження після відправки |
+| GET | `/success/<str:code>/` | `request_success` | Публічна | Показує код доступу після подачі |
+| GET/POST | `/check/` | `check_request_status` | Публічна | **Перевірка статусу за кодом** |
 | GET/POST | `/login/` | `login_view` | Публічна | Вхід у систему |
 | GET | `/logout/` | `logout_view` | Авторизований | Вихід |
-| GET | `/dashboard/` | `dashboard` | Волонтер+ | Реєстр заявок |
+| GET | `/dashboard/` | `dashboard` | Волонтер+ | Реєстр заявок з фільтрами |
 | GET/POST | `/requests/<pk>/` | `request_detail` | Волонтер+ | Деталі + зміна статусу |
 | GET | `/volunteers/` | `volunteer_list` | Директор | Список волонтерів |
 | GET/POST | `/volunteers/add/` | `volunteer_create` | Директор | Створення волонтера |
@@ -942,42 +839,22 @@ make test           # python manage.py test
 
 ## 14. Ролі та права доступу
 
-### Волонтер (`role = VOLUNTEER`)
-Стандартний обліковий запис співробітника фонду.
+### Як створити директора
 
-**Може:**
-- Переглядати всі заявки на дашборді
-- Фільтрувати та шукати заявки
-- Взяти заявку в роботу (стає `assigned_to`)
-- Додавати внутрішні коментарі
-- Вносити дані закупівлі (IN-BUY)
-- Змінювати статуси в межах дозволених переходів
-
-**Не може:**
-- Генерувати Excel-звіти
-- Керувати обліковими записами
-
-### Директор (`role = DIRECTOR`)
-Керівник фонду. Всі права волонтера + додаткові.
-
-**Додатково може:**
-- Генерувати Excel-звіти для донорів
-- Переглядати список всіх волонтерів
-- Додавати нових волонтерів/директорів
-- Блокувати/розблоковувати доступ
+Тільки через термінал (один раз):
+```bash
+docker compose exec web python manage.py createsuperuser
+# Потім у /admin/ → Users → встанови role=DIRECTOR, is_staff=True
+```
 
 ### Як створити волонтера
 
-**Через адмін-панель:**
+**Через інтерфейс директора** (рекомендовано):
 ```
-http://localhost:8000/admin/ → Users → Add User
-Email: volunteer@syla.ua | Role: VOLUNTEER
+Увійти як директор → /volunteers/add/ → заповнити форму
 ```
 
-**Через Django Shell:**
-```bash
-docker compose exec web python manage.py shell
-```
+**Через Django shell:**
 ```python
 from apps.accounts.models import CustomUser
 CustomUser.objects.create_user(
@@ -987,10 +864,17 @@ CustomUser.objects.create_user(
 )
 ```
 
-**Через інтерфейс директора:**
-```
-http://localhost:8000/volunteers/add/
-```
+### Таблиця доступу
+
+| Ресурс | Без входу | Волонтер | Директор |
+|---|---|---|---|
+| Форма заявки | ✅ | ✅ | ✅ |
+| Перевірка статусу `/check/` | ✅ | ✅ | ✅ |
+| Дашборд | ❌ | ✅ | ✅ |
+| Деталі + зміна статусу | ❌ | ✅ | ✅ |
+| Форма закупівлі IN-BUY | ❌ | ✅ | ✅ |
+| Excel-звіт | ❌ | ❌ | ✅ |
+| Управління волонтерами | ❌ | ❌ | ✅ |
 
 ---
 
@@ -1005,27 +889,68 @@ http://localhost:8000/volunteers/add/
 | FR-03 | Авторизація волонтерів за email+пароль | ✅ |
 | FR-04 | Дашборд із реєстром, сортування від нових | ✅ |
 | FR-05 | Фільтрація за статусом, категорією, підрозділом | ✅ |
-| FR-06 | Зміна статусу з перевіркою переходів | ✅ |
+| FR-06 | Зміна статусу з перевіркою переходів (State Machine) | ✅ |
 | FR-07 | Внутрішні коментарі волонтера | ✅ |
 | FR-08 | Генерація Excel-звіту за довільний період | ✅ |
 | FR-09 | Глобальний пошук по прізвищу/телефону | ✅ |
-| IN-BUY | Форма внесення даних закупівлі з фото | ✅ |
+| FR-10 | **Генерація унікального коду доступу при подачі заявки** | ✅ |
+| FR-11 | **Публічна перевірка статусу заявки за кодом** | ✅ |
+| IN-BUY | Форма внесення даних закупівлі з фото чека | ✅ |
 | UC-08 | Управління обліковими записами волонтерів | ✅ |
 
 ### Нефункціональні вимоги
 
 | Код | Вимога | Реалізація |
 |---|---|---|
+| NFR-01 | **Захист від IDOR** (перегляд чужих заявок) | access_code через secrets (CSPRNG) |
 | NFR-03 | Адаптивний інтерфейс (mobile-first) | Bootstrap 5 grid |
 | NFR-05 | СУБД PostgreSQL | PostgreSQL 16 у Docker |
 | NFR-06 | Час відповіді < 2 сек (локально) | select_related, індекси |
 | NFR-07 | Хешування паролів | PBKDF2-SHA256 (Django) |
-| NFR-08 | Захист від SQL-ін'єкцій | Django ORM (тільки) |
+| NFR-08 | Захист від SQL-ін'єкцій | Django ORM виключно |
 | NFR-09 | CSRF-захист усіх POST-форм | CsrfViewMiddleware |
 
 ---
 
-## 16. Розробник
+## 16. Управління базою даних
+
+### Очистити тестові дані
+
+**Варіант А — тільки заявки (зберігає користувачів):**
+```bash
+docker compose exec web python manage.py shell
+```
+```python
+from apps.applications.models import Request, Comment, AuditLog
+AuditLog.objects.all().delete()
+Comment.objects.all().delete()
+Request.objects.all().delete()
+```
+
+**Варіант Б — повне очищення (включно з користувачами):**
+```bash
+docker compose exec web python manage.py flush
+# Після цього потрібно знову createsuperuser + loaddata categories
+```
+
+**Варіант В — повне скидання через Docker:**
+```bash
+docker compose down -v       # видаляє PostgreSQL volume
+docker compose up -d
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py loaddata categories
+docker compose exec web python manage.py createsuperuser
+```
+
+### Підключення до PostgreSQL напряму
+
+```bash
+docker compose exec db psql -U postgres -d syla_yednosti
+```
+
+---
+
+## 17. Розробник
 
 **Слободянюк Олексій Вікторович**
 
@@ -1035,7 +960,6 @@ http://localhost:8000/volunteers/add/
 Освітньо-професійна програма «Комп'ютерні науки»
 4 курс, група ІН-403
 
-**Бакалаврська робота, 2025**
 
 ---
 
