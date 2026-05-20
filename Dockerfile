@@ -7,12 +7,6 @@ WORKDIR /app
 
 RUN mkdir -p /app/media /app/staticfiles
 
-# System dependencies
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
 # Python dependencies
 COPY requirements/base.txt requirements/base.txt
 COPY requirements/local.txt requirements/local.txt

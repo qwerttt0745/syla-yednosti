@@ -1,3 +1,5 @@
+import secrets
+
 from django.conf import settings
 from django.db import models
 
@@ -42,9 +44,19 @@ class Request(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    access_code = models.CharField(max_length=9, unique=True, blank=True)
 
     def __str__(self):
         return f"{self.user_name} - {self.get_status_display()}"
+
+    def save(self, *args, **kwargs):
+        if not self.access_code:
+            while True:
+                code = secrets.token_hex(2).upper() + "-" + secrets.token_hex(2).upper()
+                if not Request.objects.filter(access_code=code).exists():
+                    self.access_code = code
+                    break
+        super().save(*args, **kwargs)
 
 
 class Comment(models.Model):

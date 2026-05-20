@@ -12,13 +12,29 @@ from .services.status_service import StatusService
 def create_request(request):
     form = RequestForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        form.save()
-        return redirect("applications:request_success")
+        obj = form.save()
+        return redirect("applications:request_success", code=obj.access_code)
     return render(request, "applications/create_request.html", {"form": form})
 
 
-def request_success(request):
-    return render(request, "applications/request_success.html")
+def request_success(request, code: str):
+    req = get_object_or_404(Request, access_code=code)
+    return render(request, "applications/request_success.html", {"req": req})
+
+
+def check_request_status(request):
+    req = None
+    error = None
+    if request.method == "POST":
+        raw = request.POST.get("access_code", "").strip().upper()
+        if not raw:
+            error = "Введіть код заявки."
+        else:
+            try:
+                req = Request.objects.select_related("category", "assigned_to").get(access_code=raw)
+            except Request.DoesNotExist:
+                error = f"Заявку з кодом «{raw}» не знайдено. Перевірте правильність введення."
+    return render(request, "applications/check_status.html", {"req": req, "error": error})
 
 
 @login_required
