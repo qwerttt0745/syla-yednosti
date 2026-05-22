@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}Перевірити статус — Сила Єдності{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-6">
+
+    <div class="text-center mb-4">
+      <i class="bi bi-shield-lock text-warning" style="font-size:2.5rem;"></i>
+      <h1 class="h3 fw-bold mt-2">Перевірити статус заявки</h1>
+      <p class="text-muted">Введіть код, який ви отримали після подачі заявки</p>
+    </div>
+
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-4">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <label class="form-label fw-semibold">Код заявки</label>
+          <div class="input-group mb-3">
+            <span class="input-group-text font-monospace"><i class="bi bi-key me-1"></i></span>
+            <input
+              type="text"
+              name="access_code"
+              class="form-control form-control-lg font-monospace text-uppercase {% if error %}is-invalid{% endif %}"
+              placeholder="Наприклад: A3F7-2B19"
+              maxlength="9"
+              autocomplete="off"
+              value="{{ request.POST.access_code|default:''|upper }}"
+            >
+            {% if error %}
+            <div class="invalid-feedback">{{ error }}</div>
+            {% endif %}
+          </div>
+          <button type="submit" class="btn btn-warning fw-semibold w-100 py-2">
+            <i class="bi bi-search me-2"></i>Знайти заявку
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {% if req %}
+    <div class="card mt-4 shadow-sm border-0">
+      <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-semibold">
+          <i class="bi bi-file-text me-2"></i>Деталі заявки
+        </h5>
+        <span class="font-monospace text-warning fw-bold">{{ req.access_code }}</span>
+      </div>
+      <div class="card-body p-4">
+
+        <div class="text-center mb-4">
+          {% if req.status == "NEW" %}
+            <span class="badge bg-secondary fs-5 px-4 py-2">
+              <i class="bi bi-hourglass me-1"></i>{{ req.get_status_display }}
+            </span>
+            <p class="text-muted small mt-2">Заявку отримано, очікує на обробку волонтерами</p>
+          {% elif req.status == "IN_PROGRESS" %}
+            <span class="badge bg-primary fs-5 px-4 py-2">
+              <i class="bi bi-arrow-repeat me-1"></i>{{ req.get_status_display }}
+            </span>
+            <p class="text-muted small mt-2">Волонтери вже працюють над вашою заявкою</p>
+          {% elif req.status == "DONE" %}
+            <span class="badge bg-success fs-5 px-4 py-2">
+              <i class="bi bi-check-circle me-1"></i>{{ req.get_status_display }}
+            </span>
+            <p class="text-muted small mt-2">Заявку виконано!</p>
+          {% elif req.status == "CANCELED" %}
+            <span class="badge bg-danger fs-5 px-4 py-2">
+              <i class="bi bi-x-circle me-1"></i>{{ req.get_status_display }}
+            </span>
+            <p class="text-muted small mt-2">На жаль, заявку скасовано</p>
+          {% endif %}
+        </div>
+
+        <table class="table table-borderless mb-0">
+          <tbody>
+            <tr>
+              <th class="text-muted fw-normal" style="width:45%">Заявник:</th>
+              <td class="fw-semibold">{{ req.user_name }}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal">Підрозділ:</th>
+              <td>{{ req.unit_name }}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal">Категорія:</th>
+              <td>{{ req.category.name }}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal">Опис потреби:</th>
+              <td>{{ req.item_name }}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal">Кількість:</th>
+              <td>{{ req.quantity }}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal">Дата подачі:</th>
+              <td>{{ req.created_at|date:"d.m.Y H:i" }}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal">Останнє оновлення:</th>
+              <td>{{ req.updated_at|date:"d.m.Y H:i" }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {% if req.assigned_to %}
+        <div class="alert alert-info mt-3 mb-0">
+          <i class="bi bi-person-check me-1"></i>
+          Відповідальний волонтер:
+          <strong>{{ req.assigned_to.get_full_name|default:req.assigned_to.email }}</strong>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="text-center mt-4">
+      <a href="{% url 'applications:create_request' %}" class="text-muted small">
+        <i class="bi bi-arrow-left me-1"></i>Повернутись до форми заявки
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

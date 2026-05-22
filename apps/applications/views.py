@@ -1,0 +1,104 @@
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db.models import Count, Q
+from django.shortcuts import get_object_or_404, redirect, render
+
+from .forms import CommentForm, RequestForm
+from .models import AuditLog, Category, Request
+from .services.filter_service import FilterService
+from .services.status_service import StatusService
+
+
+def create_request(request):
+    form = RequestForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        obj = form.save()
+        return redirect("applications:request_success", code=obj.access_code)
+    return render(request, "applications/create_request.html", {"form": form})
+
+
+def request_success(request, code: str):
+    req = get_object_or_404(Request, access_code=code)
+    return render(request, "applications/request_success.html", {"req": req})
+
+
+def check_request_status(request):
+    req = None
+    error = None
+    if request.method == "POST":
+        raw = request.POST.get("access_code", "").strip().upper()
+        if not raw:
+            error = "Введіть код заявки."
+        else:
+            try:
+                req = Request.objects.select_related("category", "assigned_to").get(access_code=raw)
+            except Request.DoesNotExist:
+                error = f"Заявку з кодом «{raw}» не знайдено. Перевірте правильність введення."
+    return render(request, "applications/check_status.html", {"req": req, "error": error})
+
+
+@login_required
+def dashboard(request):
+    queryset = Request.objects.select_related("category", "assigned_to").order_by("-created_at")
+    queryset = FilterService.apply(
+        queryset,
+        status=request.GET.get("status") or None,
+        category_slug=request.GET.get("category") or None,
+        unit_name=request.GET.get("unit_name") or None,
+        search=request.GET.get("search") or None,
+    )
+    categories = Category.objects.all().order_by("name")
+    statuses = Request.Status.choices
+    counts = Request.objects.aggregate(
+        total=Count("id"),
+        new=Count("id", filter=Q(status="NEW")),
+        in_progress=Count("id", filter=Q(status="IN_PROGRESS")),
+        done=Count("id", filter=Q(status="DONE")),
+    )
+    return render(
+        request,
+        "applications/dashboard.html",
+        {
+            "requests": queryset,
+            "categories": categories,
+            "statuses": statuses,
+            "counts": counts,
+        },
+    )
+
+
+@login_required
+def request_detail(request, pk: int):
+    req = get_object_or_404(Request.objects.select_related("category", "assigned_to"), pk=pk)
+    comment_form = CommentForm(request.POST or None)
+
+    if "new_status" in request.POST:
+        new_status = request.POST["new_status"]
+        req._changed_by = request.user
+        if StatusService.transition(req, new_status, request.user):
+            messages.success(request, "Статус змінено")
+        else:
+            messages.error(request, "Недозволений перехід статусу")
+        return redirect("applications:request_detail", pk=req.pk)
+
+    if request.method == "POST" and comment_form.is_valid():
+        comment = comment_form.save(commit=False)
+        comment.request = req
+        comment.author = request.user
+        comment.save()
+        messages.success(request, "Нотатку додано")
+        return redirect("applications:request_detail", pk=req.pk)
+
+    audit_logs = AuditLog.objects.filter(request=req).order_by("-changed_at")
+    allowed_transitions = StatusService.allowed_transitions(req)
+
+    return render(
+        request,
+        "applications/request_detail.html",
+        {
+            "req": req,
+            "comment_form": comment_form,
+            "allowed_transitions": allowed_transitions,
+            "audit_logs": audit_logs,
+        },
+    )
