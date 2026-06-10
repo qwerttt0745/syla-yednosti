@@ -27,4 +27,14 @@ staticfiles/
 *.swo
 
 # macOS
+<<<<<<< HEAD
 .DS_Store
+=======
+.DS_Store
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+>>>>>>> 66faa1eb195b4a22089f8152327b2e581749f9da
