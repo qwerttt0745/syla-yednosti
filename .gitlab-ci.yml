@@ -1,0 +1,11 @@
+stages:
+  - lint
+
+lint:
+  stage: lint
+  image: python:3.12-slim
+  before_script:
+    - pip install --no-cache-dir -r requirements/dev.txt
+  script:
+    - black --check .
+    - flake8 .
