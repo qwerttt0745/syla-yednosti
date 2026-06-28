@@ -68,7 +68,9 @@ def volunteer_create(request):
         )
         messages.success(request, f"Користувача {user.email} створено успішно.")
         return redirect("accounts:volunteer_list")
-    return render(request, "accounts/volunteer_form.html", {"form": form, "action": "Додати"})
+    return render(
+        request, "accounts/volunteer_form.html", {"form": form, "action": "Додати"}
+    )
 
 
 @login_required

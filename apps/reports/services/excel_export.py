@@ -38,7 +38,11 @@ def generate_report(purchases, date_from, date_to) -> bytes:
     count = 0
 
     for row_idx, purchase in enumerate(purchases_list, start=4):
-        fill = PatternFill(fill_type="solid", fgColor="F8F9FA") if row_idx % 2 == 0 else None
+        fill = (
+            PatternFill(fill_type="solid", fgColor="F8F9FA")
+            if row_idx % 2 == 0
+            else None
+        )
         values = [
             purchase.purchase_date,
             purchase.request.unit_name,

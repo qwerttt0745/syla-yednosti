@@ -17,7 +17,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Category",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 ("name", models.CharField(max_length=120, unique=True)),
                 ("slug", models.SlugField(max_length=120, unique=True)),
             ],
@@ -25,7 +33,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Request",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 ("user_name", models.CharField(max_length=255)),
                 ("phone", models.CharField(max_length=20)),
                 ("unit_name", models.CharField(max_length=255)),
@@ -83,7 +99,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Comment",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 ("text", models.TextField()),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 (
@@ -108,7 +132,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="AuditLog",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 ("old_status", models.CharField(blank=True, max_length=20)),
                 ("new_status", models.CharField(max_length=20)),
                 ("changed_at", models.DateTimeField(auto_now_add=True)),

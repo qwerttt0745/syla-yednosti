@@ -9,5 +9,7 @@ urlpatterns = [
     path("logout/", views.logout_view, name="logout"),
     path("volunteers/", views.volunteer_list, name="volunteer_list"),
     path("volunteers/add/", views.volunteer_create, name="volunteer_create"),
-    path("volunteers/<int:pk>/toggle/", views.volunteer_toggle, name="volunteer_toggle"),
+    path(
+        "volunteers/<int:pk>/toggle/", views.volunteer_toggle, name="volunteer_toggle"
+    ),
 ]

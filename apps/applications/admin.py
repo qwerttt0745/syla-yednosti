@@ -36,4 +36,10 @@ class CommentAdmin(admin.ModelAdmin):
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
     list_display = ("request", "old_status", "new_status", "changed_by", "changed_at")
-    readonly_fields = ("request", "old_status", "new_status", "changed_by", "changed_at")
+    readonly_fields = (
+        "request",
+        "old_status",
+        "new_status",
+        "changed_by",
+        "changed_at",
+    )

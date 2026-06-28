@@ -27,8 +27,12 @@ class Request(models.Model):
     user_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=20)
     unit_name = models.CharField(max_length=255)
-    category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="requests")
-    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.MEDIUM)
+    category = models.ForeignKey(
+        Category, on_delete=models.PROTECT, related_name="requests"
+    )
+    priority = models.CharField(
+        max_length=20, choices=Priority.choices, default=Priority.MEDIUM
+    )
     item_name = models.TextField()
     quantity = models.PositiveIntegerField()
     location = models.CharField(max_length=255)
@@ -60,7 +64,9 @@ class Request(models.Model):
 
 
 class Comment(models.Model):
-    request = models.ForeignKey(Request, on_delete=models.CASCADE, related_name="comments")
+    request = models.ForeignKey(
+        Request, on_delete=models.CASCADE, related_name="comments"
+    )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -72,7 +78,9 @@ class Comment(models.Model):
 
 
 class AuditLog(models.Model):
-    request = models.ForeignKey(Request, on_delete=models.CASCADE, related_name="audit_logs")
+    request = models.ForeignKey(
+        Request, on_delete=models.CASCADE, related_name="audit_logs"
+    )
     old_status = models.CharField(max_length=20, blank=True)
     new_status = models.CharField(max_length=20)
     changed_by = models.ForeignKey(

@@ -5,7 +5,9 @@ from apps.applications.models import Request
 
 
 class Purchase(models.Model):
-    request = models.OneToOneField(Request, on_delete=models.CASCADE, related_name="purchase")
+    request = models.OneToOneField(
+        Request, on_delete=models.CASCADE, related_name="purchase"
+    )
     actual_cost = models.DecimalField(max_digits=10, decimal_places=2)
     purchase_date = models.DateField()
     funding_source = models.CharField(max_length=255)

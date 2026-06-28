@@ -31,15 +31,21 @@ def check_request_status(request):
             error = "Введіть код заявки."
         else:
             try:
-                req = Request.objects.select_related("category", "assigned_to").get(access_code=raw)
+                req = Request.objects.select_related("category", "assigned_to").get(
+                    access_code=raw
+                )
             except Request.DoesNotExist:
                 error = f"Заявку з кодом «{raw}» не знайдено. Перевірте правильність введення."
-    return render(request, "applications/check_status.html", {"req": req, "error": error})
+    return render(
+        request, "applications/check_status.html", {"req": req, "error": error}
+    )
 
 
 @login_required
 def dashboard(request):
-    queryset = Request.objects.select_related("category", "assigned_to").order_by("-created_at")
+    queryset = Request.objects.select_related("category", "assigned_to").order_by(
+        "-created_at"
+    )
     queryset = FilterService.apply(
         queryset,
         status=request.GET.get("status") or None,
@@ -69,7 +75,9 @@ def dashboard(request):
 
 @login_required
 def request_detail(request, pk: int):
-    req = get_object_or_404(Request.objects.select_related("category", "assigned_to"), pk=pk)
+    req = get_object_or_404(
+        Request.objects.select_related("category", "assigned_to"), pk=pk
+    )
     comment_form = CommentForm(request.POST or None)
 
     if "new_status" in request.POST:

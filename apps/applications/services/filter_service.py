@@ -21,5 +21,7 @@ class FilterService:
         if unit_name:
             queryset = queryset.filter(unit_name__icontains=unit_name)
         if search:
-            queryset = queryset.filter(Q(user_name__icontains=search) | Q(phone__icontains=search))
+            queryset = queryset.filter(
+                Q(user_name__icontains=search) | Q(phone__icontains=search)
+            )
         return queryset

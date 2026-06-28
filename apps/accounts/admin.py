@@ -12,10 +12,11 @@ class CustomUserAdmin(UserAdmin):
     ordering = ("email",)
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Роль та доступ", {"fields": ("role", "is_active", "is_staff", "is_superuser")}),
+        (
+            "Роль та доступ",
+            {"fields": ("role", "is_active", "is_staff", "is_superuser")},
+        ),
     )
-    add_fieldsets = (
-        (None, {"fields": ("email", "password1", "password2", "role")}),
-    )
+    add_fieldsets = ((None, {"fields": ("email", "password1", "password2", "role")}),)
     search_fields = ("email",)
     filter_horizontal = ()

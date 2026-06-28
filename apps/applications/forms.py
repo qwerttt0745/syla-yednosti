@@ -20,7 +20,9 @@ class RequestForm(forms.ModelForm):
         ]
         widgets = {
             "user_name": forms.TextInput(attrs={"class": "form-control"}),
-            "phone": forms.TextInput(attrs={"class": "form-control", "placeholder": "+380"}),
+            "phone": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "+380"}
+            ),
             "unit_name": forms.TextInput(attrs={"class": "form-control"}),
             "category": forms.Select(attrs={"class": "form-select"}),
             "priority": forms.Select(attrs={"class": "form-select"}),

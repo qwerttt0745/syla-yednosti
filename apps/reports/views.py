@@ -32,7 +32,9 @@ def export_report(request):
         response["Content-Disposition"] = "attachment; filename=report.xlsx"
         return response
 
-    return render(request, "reports/report_form.html", {"today": date.today().isoformat()})
+    return render(
+        request, "reports/report_form.html", {"today": date.today().isoformat()}
+    )
 
 
 @login_required
